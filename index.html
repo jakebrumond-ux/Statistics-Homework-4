@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Penetration score: LLN and CLT simulator</title>
+<style>
+:root{--bg:#fafaf7;--fg:#1f2328;--mut:#667;--card:#fff;--bd:#d8d8d0;--a:#2a6fdb;--b:#d9531e;--box-sizing:border-box;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#e8e8e4;--mut:#9aa;--card:#1e2126;--bd:#343a42;--a:#6aa3ff;--b:#ff8a5c;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15171a;--fg:#e8e8e4;--mut:#9aa;--card:#1e2126;--bd:#343a42;--a:#6aa3ff;--b:#ff8a5c;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1000px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:.2em 0}p.s{color:var(--mut);margin:.2em 0 1em}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:14px}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 18px}
+label{display:block;font-size:.85rem;color:var(--mut)}label b{color:var(--fg)}
+input[type=range]{width:100%}select,button{font:inherit;padding:4px 8px;border-radius:6px;border:1px solid var(--bd);background:var(--card);color:var(--fg)}
+button{cursor:pointer;background:var(--a);color:#fff;border:0}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+canvas{width:100%;height:280px;display:block}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.85rem}th,td{padding:4px 8px;border-bottom:1px solid var(--bd);text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}
+h2{font-size:1rem;margin:0 0 6px}h3{font-size:1.05rem;margin:0 0 8px}.card ul,.card ol{margin:.3em 0 .6em;padding-left:1.3em}.card li{margin:.35em 0}.concl{border-left:3px solid var(--a);padding-left:10px;margin-top:10px}.n{font-size:.85rem;color:var(--mut)}
+</style></head><body><main>
+<h1>Penetration score simulator: LLN and CLT</h1>
+<p class="s">Each of <b>m attackers</b> works through <b>n systems</b>; Xᵢ is the score on system i and Sₙ the attacker’s total.</p>
+<div class="card ctl">
+<label>Model<br><select id="model"><option value="b">Bernoulli {0,1}</option><option value="r">Rademacher {−1,+1}</option></select></label>
+<label id="pl">p = <b id="pv">0.30</b><input id="p" type="range" min="0.05" max="0.95" step="0.05" value="0.3"></label>
+<label>n (systems) = <b id="nv">1000</b><input id="n" type="range" min="1" max="4" step="0.05" value="3"></label>
+<label>m (attackers) = <b id="mv">2000</b><input id="m" type="range" min="100" max="5000" step="100" value="2000"></label>
+<label>ε (LLN tolerance) = <b id="ev">0.05</b><input id="e" type="range" min="0.01" max="0.2" step="0.01" value="0.05"></label>
+<label>Trajectory plot<br><select id="tq"><option value="S">Sₖ (total)</option><option value="A" selected>Sₖ/k (average)</option><option value="Z">Sₖ/√k (normalized)</option></select></label>
+<label>Histogram of<br><select id="hq"><option value="S">Sₙ</option><option value="A">Sₙ/n</option><option value="Z" selected>Sₙ/√n</option></select></label>
+<label><br><button id="go">Resimulate</button></label>
+</div>
+<div class="row">
+<div class="card"><h2>Sample trajectories (30 attackers)</h2><canvas id="c1"></canvas><div class="n" id="t1"></div></div>
+<div class="card"><h2>Distribution across m attackers</h2><canvas id="c2"></canvas><div class="n" id="t2"></div></div>
+</div>
+<div class="card"><h2>Statistics</h2><div class="tw"><table id="tb"></table></div>
+<p class="n" id="note"></p></div>
+<div class="card n"><b>Reading the page.</b> Var(Sₙ)=nσ² grows, Var(Sₙ/n)=σ²/n shrinks to 0 (LLN: the fraction of attackers with |Sₙ/n−μ|&gt;ε goes to 0), and Var(Sₙ/√n)=σ² stays constant. In the Rademacher case Sₙ/√n approaches N(0,1) (CLT); in the Bernoulli case it drifts with mean √n·p, so the standardized version (Sₙ−np)/√(np(1−p)) is what converges. Larger m only sharpens the empirical picture; it does not change a single attacker’s distribution.</div>
+<div class="card"><h3>Interpretation: n systems and m attackers</h3><ul><li><b>Increasing n:</b> adds more score increments to each trajectory. The total’s typical fluctuation scale is √n, while the average becomes more stable and concentrates near μ.</li><li><b>Increasing m:</b> does not change the theoretical distribution; it increases the number of independent paths and generally improves the accuracy of estimated histograms and sample statistics.</li><li><b>Rademacher model:</b> positive and negative increments cancel on average, producing a zero long-run mean and a normalized total with an approximately normal shape for large n.</li><li><b>Bernoulli model:</b> increments are nonnegative, so the average estimates the success probability p. The normalized total needs centering to apply the CLT when p is nonzero.</li></ul><div class="concl"><b>Conclusion:</b> n controls the behavior of each accumulated process, while m controls the precision of the simulation. The LLN explains concentration of averages; the CLT explains the approximately Gaussian shape of properly centered and scaled sums.</div></div>
+<div class="card"><h3>Suggested experiment report</h3><ol><li>Run both models for n = 10, 100, 1000 while keeping m fixed.</li><li>Record empirical means and variances of Sₙ, Sₙ/n and Sₙ/√n (see the statistics table above).</li><li>For Rademacher, observe the normalized histogram approach the standard normal curve as n increases.</li><li>Repeat with larger m and explain how histograms become less noisy without changing the theoretical distribution.</li></ol></div>
+</main>
+<script>
+const $=id=>document.getElementById(id),css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let D=null;
+function erf(x){const s=Math.sign(x);x=Math.abs(x);const t=1/(1+.3275911*x);return s*(1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-x*x))}
+const Phi=z=>.5*(1+erf(z/Math.SQRT2)),phi=z=>Math.exp(-z*z/2)/Math.sqrt(2*Math.PI);
+function par(){const r=$('model').value==='r',p=+$('p').value;return{r,p,mu:r?0:p,v:r?1:p*(1-p),n:Math.round(Math.pow(10,+$('n').value)),m:+$('m').value,e:+$('e').value}}
+const draw1=(P)=>P.r?(Math.random()<.5?-1:1):(Math.random()<P.p?1:0);
+function sim(){
+ const P=par();const S=new Float64Array(P.m);
+ for(let i=0;i<P.m;i++){let s=0;for(let k=0;k<P.n;k++)s+=draw1(P);S[i]=s}
+ const T=30,K=Math.min(P.n,400),idx=[],paths=[];
+ for(let j=1;j<=K;j++)idx.push(Math.max(1,Math.round(j*P.n/K)));
+ for(let t=0;t<T;t++){const a=[];let s=0,k=0;for(const id of idx){while(k<id){s+=draw1(P);k++}a.push(s)}paths.push(a)}
+ D={P,S,idx,paths};render()}
+function setup(c){const d=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;c.width=w*d;c.height=h*d;const g=c.getContext('2d');g.setTransform(d,0,0,d,0,0);g.clearRect(0,0,w,h);return[g,w,h]}
+function axes(g,w,h,x0,x1,y0,y1,L){const M={l:44,r:10,t:8,b:24};g.strokeStyle=css('--bd');g.fillStyle=css('--mut');g.font='11px system-ui';g.lineWidth=1;
+ const X=x=>M.l+(x-x0)/(x1-x0||1)*(w-M.l-M.r),Y=y=>h-M.b-(y-y0)/(y1-y0||1)*(h-M.t-M.b);
+ g.beginPath();g.moveTo(M.l,M.t);g.lineTo(M.l,h-M.b);g.lineTo(w-M.r,h-M.b);g.stroke();
+ for(let i=0;i<=4;i++){const y=y0+(y1-y0)*i/4;g.fillText(fmt(y),2,Y(y)+4);const x=x0+(x1-x0)*i/4;g.fillText(fmt(x),X(x)-10,h-8)}
+ return{X,Y,M}}
+function fmt(v){const a=Math.abs(v);return a>=1000||(a<.01&&a>0)?v.toExponential(0):(+v.toPrecision(3)).toString()}
+const tf=(q,s,k)=>q==='S'?s:q==='A'?s/k:s/Math.sqrt(k);
+function render(){if(!D)return;const{P,S,idx,paths}=D;
+ // trajectories
+ let[g,w,h]=setup($('c1'));const q=$('tq').value;let lo=1e9,hi=-1e9;
+ const V=paths.map(a=>a.map((s,j)=>{const v=tf(q,s,idx[j]);if(idx[j]>(q==='A'?P.n*.02:0)){lo=Math.min(lo,v);hi=Math.max(hi,v)}return v}));
+ if(q==='A'){lo=Math.min(lo,P.mu);hi=Math.max(hi,P.mu)}
+ const A=axes(g,w,h,0,P.n,lo,hi);
+ V.forEach((v,t)=>{g.beginPath();v.forEach((y,j)=>{const X=A.X(idx[j]),Y=A.Y(Math.max(lo,Math.min(hi,y)));j?g.lineTo(X,Y):g.moveTo(X,Y)});g.strokeStyle=css('--a');g.globalAlpha=.45;g.lineWidth=1;g.stroke()});g.globalAlpha=1;
+ const ref=q==='S'?null:(q==='A'?P.mu:null);
+ if(ref!==null){g.setLineDash([5,4]);g.strokeStyle=css('--b');g.lineWidth=1.5;g.beginPath();g.moveTo(A.M.l,A.Y(ref));g.lineTo(w-10,A.Y(ref));g.stroke();g.setLineDash([])}
+ $('t1').textContent=q==='A'?'Dashed line: μ = '+P.mu+'. Paths contract onto it (LLN).':q==='S'?'Spread of Sₖ grows like √k around kμ.':'Spread stays O(1); with μ≠0 the paths also drift like √k·μ.';
+ // histogram
+ const hq=$('hq').value,n=P.n;const val=S.map?Array.from(S,s=>tf(hq,s,n)):[];
+ const mean=hq==='S'?n*P.mu:hq==='A'?P.mu:P.mu*Math.sqrt(n),sd=hq==='S'?Math.sqrt(n*P.v):hq==='A'?Math.sqrt(P.v/n):Math.sqrt(P.v);
+ let a=Math.min(...val),b=Math.max(...val);if(a===b){a-=1;b+=1}
+ const nb=Math.max(10,Math.min(50,Math.round(Math.sqrt(P.m)))),bw=(b-a)/nb,cnt=new Array(nb).fill(0);
+ val.forEach(v=>cnt[Math.min(nb-1,Math.floor((v-a)/bw))]++);
+ const dens=cnt.map(c=>c/(P.m*bw));let ym=Math.max(...dens,phi(0)/sd);
+ [g,w,h]=setup($('c2'));const B=axes(g,w,h,a,b,0,ym);
+ g.fillStyle=css('--a');g.globalAlpha=.55;dens.forEach((d,i)=>{const x0=B.X(a+i*bw),x1=B.X(a+(i+1)*bw);g.fillRect(x0,B.Y(d),Math.max(1,x1-x0-1),B.Y(0)-B.Y(d))});g.globalAlpha=1;
+ g.beginPath();for(let i=0;i<=200;i++){const x=a+(b-a)*i/200,y=phi((x-mean)/sd)/sd;i?g.lineTo(B.X(x),B.Y(y)):g.moveTo(B.X(x),B.Y(y))}g.strokeStyle=css('--b');g.lineWidth=2;g.stroke();
+ $('t2').textContent='Bars: simulated density. Curve: normal with the theoretical mean '+fmt(mean)+' and sd '+fmt(sd)+'.';
+ // stats
+ const mom=f=>{let s=0,s2=0;for(const x of S){const v=f(x);s+=v;s2+=v*v}const mu=s/S.length;return[mu,s2/S.length-mu*mu]};
+ const[mS,vS]=mom(x=>x),[mA,vA]=mom(x=>x/n),[mZ,vZ]=mom(x=>x/Math.sqrt(n));
+ const z=Array.from(S,s=>(s-n*P.mu)/Math.sqrt(n*P.v)).sort((x,y)=>x-y);let ks=0;
+ z.forEach((x,i)=>{const F=Phi(x);ks=Math.max(ks,Math.abs(F-i/z.length),Math.abs(F-(i+1)/z.length))});
+ const pr=S.filter(s=>Math.abs(s/n-P.mu)>P.e).length/P.m,cheb=Math.min(1,P.v/(n*P.e*P.e));
+ $('tb').innerHTML='<tr><th>Quantity</th><th>Mean (sim)</th><th>Mean (theory)</th><th>Var (sim)</th><th>Var (theory)</th></tr>'+
+ [['Sₙ',mS,n*P.mu,vS,n*P.v],['Sₙ/n',mA,P.mu,vA,P.v/n],['Sₙ/√n',mZ,P.mu*Math.sqrt(n),vZ,P.v]].map(r=>'<tr><td>'+r[0]+'</td>'+r.slice(1).map(x=>'<td>'+fmt(x)+'</td>').join('')+'</tr>').join('');
+ $('note').textContent='n = '+n+', m = '+P.m+'. P(|Sₙ/n − μ| > ε) = '+pr.toFixed(4)+' (Chebyshev bound '+cheb.toFixed(4)+'). KS distance of standardized Sₙ to N(0,1): '+ks.toFixed(4)+'; Monte Carlo noise floor is about '+(1/Math.sqrt(P.m)).toFixed(3)+'.'}
+function lab(){const P=par();$('pv').textContent=P.p.toFixed(2);$('nv').textContent=P.n;$('mv').textContent=P.m;$('ev').textContent=P.e.toFixed(2);$('pl').style.display=P.r?'none':'block'}
+let tm;['model','p','n','m'].forEach(i=>$(i).addEventListener('input',()=>{lab();clearTimeout(tm);tm=setTimeout(sim,250)}));
+$('e').addEventListener('input',()=>{lab();render()});['tq','hq'].forEach(i=>$(i).addEventListener('input',render));
+$('go').onclick=sim;addEventListener('resize',render);matchMedia('(prefers-color-scheme:dark)').addEventListener('change',render);
+lab();sim();
+</script></body></html>
